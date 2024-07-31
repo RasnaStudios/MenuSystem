@@ -239,6 +239,13 @@ void AMenuSystemCharacter::OnJoinSessionComplete(FName SessionName, EOnJoinSessi
         // We travel to the lobby map with the connect string
         PlayerController->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
     }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, TEXT("Failed to join session"));
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
