@@ -28,7 +28,11 @@ public class MultiplayerSessions : ModuleRules
                 "Core",
                 // ... add other public dependencies that you statically link with here ...
                 "OnlineSubsystem",
-                "OnlineSubsystemSteam"
+                "OnlineSubsystemSteam",
+                // The following modules are required for the UMG UI (UserWidget) to work
+                "UMG",
+                "Slate",
+                "SlateCore",
             }
             );
 
