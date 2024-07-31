@@ -4,6 +4,7 @@
 
 #include "Components/Button.h"
 #include "MultiplayerSessionsSubsystem.h"
+#include "OnlineSessionSettings.h"
 
 void UMenu::NativeDestruct()
 {
@@ -41,7 +42,10 @@ void UMenu::MenuSetup(int32 NumberOfPublicConnections, FString TypeOfMatch)
     if (MultiplayerSessionsSubsystem)
     {
         MultiplayerSessionsSubsystem->MultiplayerOnCreateSessionComplete.AddDynamic(this, &ThisClass::OnCreateSession);
-        UE_LOG(LogTemp, Warning, TEXT("Bound OnCreateSession"));
+        MultiplayerSessionsSubsystem->MultiplayerOnFindSessionsComplete.AddUObject(this, &ThisClass::OnFindSessions);
+        MultiplayerSessionsSubsystem->MultiplayerOnJoinSessionComplete.AddUObject(this, &ThisClass::OnJoinSession);
+        MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionComplete.AddDynamic(this, &ThisClass::OnDestroySession);
+        MultiplayerSessionsSubsystem->MultiplayerOnStartSessionComplete.AddDynamic(this, &ThisClass::OnStartSession);
     }
 }
 
@@ -74,8 +78,10 @@ void UMenu::HostButtonClicked()
 
 void UMenu::JoinButtonClicked()
 {
-    if (GEngine)
-        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("Join Button Clicked"));
+    if (MultiplayerSessionsSubsystem)
+    {
+        MultiplayerSessionsSubsystem->FindSessions(10000);
+    }
 }
 
 void UMenu::MenuTearDown()
@@ -109,4 +115,56 @@ void UMenu::OnCreateSession(bool bWasSuccessful)
         if (GEngine)
             GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Failed to create session"));
     }
+}
+
+void UMenu::OnFindSessions(const TArray<FOnlineSessionSearchResult>& SearchResults, bool bWasSuccessful)
+{
+    if (MultiplayerSessionsSubsystem == nullptr)
+    {
+        return;
+    }
+
+    for (const FOnlineSessionSearchResult& SearchResult : SearchResults)
+    {
+        FString SettingsValue;
+        SearchResult.Session.SessionSettings.Get(FName("MatchType"), SettingsValue);
+        if (SettingsValue == MatchType)
+        {
+            // Session found
+            if (GEngine)
+                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Found a session with the same match type"));
+            // Join the session
+            if (MultiplayerSessionsSubsystem)
+            {
+                MultiplayerSessionsSubsystem->JoinSession(SearchResult);
+            }
+            return;
+        }
+    }
+}
+void UMenu::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
+{
+    if (IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get())
+    {
+        IOnlineSessionPtr SessionInterface = OnlineSubsystem->GetSessionInterface();
+        if (SessionInterface.IsValid())
+        {
+            FString ConnectionString;
+            if (SessionInterface->GetResolvedConnectString(NAME_GameSession, ConnectionString))
+            {
+                // Travel to the lobby level using the player controller from the game instance
+                if (APlayerController* PlayerController = GetGameInstance()->GetFirstLocalPlayerController())
+                {
+                    PlayerController->ClientTravel(ConnectionString, ETravelType::TRAVEL_Absolute);
+                }
+            }
+        }
+    }
+}
+
+void UMenu::OnDestroySession(bool bWasSuccessful)
+{
+}
+void UMenu::OnStartSession(bool bWasSuccessful)
+{
 }

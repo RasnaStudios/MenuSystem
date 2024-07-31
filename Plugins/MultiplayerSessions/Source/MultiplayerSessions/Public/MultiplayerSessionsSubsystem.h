@@ -27,9 +27,15 @@
  * Note:
  * - The delegate signature must match the function signature of the bound function in the Menu class.
  * - The functions in the Menu class must be declared as UFUNCTION() to be bound to the delegate.
- *
  */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMultiplayerOnCreateSessionComplete, bool, bWasSuccessful);
+DECLARE_MULTICAST_DELEGATE_TwoParams(
+    FMultiplayerOnFindSessionComplete, const TArray<FOnlineSessionSearchResult>& SearchResults, bool bWasSuccessful);
+DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnJoinSessionComplete, EOnJoinSessionCompleteResult::Type Result);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMultiplayerOnDestroySessionComplete, bool, bWasSuccessful);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMultiplayerOnStartSessionComplete, bool, bWasSuccessful);
+
+// Note, the second and the third delegates are not dynamic because they use parameters that are not supported by dynamic delegates.
 
 UCLASS()
 class MULTIPLAYERSESSIONS_API UMultiplayerSessionsSubsystem : public UGameInstanceSubsystem
@@ -54,6 +60,10 @@ public:
     // Our own custom delegates for the Menu class to bind callbacks to
     //
     FMultiplayerOnCreateSessionComplete MultiplayerOnCreateSessionComplete;
+    FMultiplayerOnFindSessionComplete MultiplayerOnFindSessionsComplete;
+    FMultiplayerOnJoinSessionComplete MultiplayerOnJoinSessionComplete;
+    FMultiplayerOnDestroySessionComplete MultiplayerOnDestroySessionComplete;
+    FMultiplayerOnStartSessionComplete MultiplayerOnStartSessionComplete;
 
 protected:
     //
@@ -72,6 +82,7 @@ private:
 
     // The last session settings used to create a session
     TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
+    TSharedPtr<FOnlineSessionSearch> LastSessionSearch;
 
     //
     // To add to the Online Session Interface delegate list

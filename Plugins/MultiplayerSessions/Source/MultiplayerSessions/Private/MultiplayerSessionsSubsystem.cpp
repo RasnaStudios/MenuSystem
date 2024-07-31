@@ -2,6 +2,7 @@
 
 #include "MultiplayerSessionsSubsystem.h"
 
+#include "Online/OnlineSessionNames.h"
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 
@@ -46,6 +47,7 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
     LastSessionSettings->bAllowJoinViaPresence = true;    // Allow players to join the session via presence (friends list)
     LastSessionSettings->bShouldAdvertise = true;    // Advertise the session to the online subsystem so other players can find it
     LastSessionSettings->bUsesPresence = true;       // Use presence (friends list) to find the session
+    LastSessionSettings->bUseLobbiesIfAvailable = true;    // Use lobbies if available
     LastSessionSettings->Set(
         FName("MatchType"), MatchType, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);    // Set the match type
 
@@ -65,9 +67,50 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
 
 void UMultiplayerSessionsSubsystem::FindSessions(int32 MaxSearchResults)
 {
+    if (!SessionInterface.IsValid())
+    {
+        return;
+    }
+    // Store the delegate handle, so we can remove it later from the delegate list
+    SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
+
+    // We create the session search settings
+    LastSessionSearch = MakeShared<FOnlineSessionSearch>();
+    LastSessionSearch->MaxSearchResults = MaxSearchResults;    // Maximum number of search results
+    LastSessionSearch->bIsLanQuery = IOnlineSubsystem::Get()->GetSubsystemName() ==
+                                     "NULL";    // If there's a subsystem then the match is LAN, otherwise it's online
+    LastSessionSearch->QuerySettings.Set(
+        SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);    // Search for sessions with presence (friends list)
+
+    const ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer();
+    if (SessionInterface->FindSessions(*LocalPlayer->GetPreferredUniqueNetId(), LastSessionSearch.ToSharedRef()))
+    {
+        // If the search fails, remove the delegate handle and broadcast the custom delegate
+        SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+        // Broadcast the custom delegate with an empty array because we didn't find any sessions
+        MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+    }
 }
 void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult& SearchResult)
 {
+    if (!SessionInterface.IsValid())
+    {
+        MultiplayerOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+        UE_LOG(LogTemp, Error, TEXT("Session interface is not valid"));
+        return;
+    }
+
+    // Store the delegate handle, so we can remove it later from the delegate list
+    SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
+
+    // Join the session
+    const ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer();
+    if (!SessionInterface->JoinSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, SearchResult))
+    {
+        // If the join fails, remove the delegate handle and broadcast the custom delegate with an error
+        SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+        MultiplayerOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+    }
 }
 void UMultiplayerSessionsSubsystem::DestroySession()
 {
@@ -89,9 +132,28 @@ void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, b
 }
 void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 {
+    // Remove the delegate handle
+    if (SessionInterface)
+        SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+
+    if (LastSessionSearch->SearchResults.Num() <= 0)
+    {
+        // Broadcast our own custom delegate. The menu will receive an empty array and false
+        MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+        return;
+    }
+
+    // Broadcast our own custom delegate. The menu will receive the search results and the value of bWasSuccessful
+    MultiplayerOnFindSessionsComplete.Broadcast(LastSessionSearch->SearchResults, bWasSuccessful);
 }
 void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
 {
+    // Remove the delegate handle
+    if (SessionInterface)
+        SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+
+    // Broadcast our own custom delegate. The menu will receive the result of the join operation
+    MultiplayerOnJoinSessionComplete.Broadcast(Result);
 }
 void UMultiplayerSessionsSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {

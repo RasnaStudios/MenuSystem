@@ -4,6 +4,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "Interfaces/OnlineSessionInterface.h"
 
 #include "Menu.generated.h"
 
@@ -40,6 +41,14 @@ protected:
     //
     UFUNCTION()
     void OnCreateSession(bool bWasSuccessful);
+    // not UFUNCTION() because the delegate is not dynamic
+    void OnFindSessions(const TArray<FOnlineSessionSearchResult>& SearchResults, bool bWasSuccessful);
+    // not UFUNCTION() because the delegate is not dynamic
+    void OnJoinSession(EOnJoinSessionCompleteResult::Type Result);
+    UFUNCTION()
+    void OnDestroySession(bool bWasSuccessful);
+    UFUNCTION()
+    void OnStartSession(bool bWasSuccessful);
 
 private:
     // These buttons are binded in the blueprint and the names must match the names in the blueprint
