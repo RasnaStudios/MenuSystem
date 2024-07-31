@@ -9,8 +9,28 @@
 #include "MultiplayerSessionsSubsystem.generated.h"
 
 /**
+ * UMultiplayerSessionsSubsystem class is a game instance subsystem that provides functionality for handling multiplayer sessions.
+ */
+
+/**
+ * Custom delegates for handling multiplayer session events.
+ * These delegates serve as communication channels between the MultiplayerSessionsSubsystem and the Menu class.
+ *
+ * The Menu class will:
+ * 1. Call the public session management functions (CreateSession, FindSessions, JoinSession, DestroySession, StartSession) in this
+ * subsystem.
+ * 2. Bind its own functions to these delegates to handle the results of the session operations.
+ *
+ * When a session operation completes, the corresponding delegate will be broadcast,
+ * allowing the Menu class to respond appropriately to the success or failure of each operation.
+ *
+ * Note:
+ * - The delegate signature must match the function signature of the bound function in the Menu class.
+ * - The functions in the Menu class must be declared as UFUNCTION() to be bound to the delegate.
  *
  */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMultiplayerOnCreateSessionComplete, bool, bWasSuccessful);
+
 UCLASS()
 class MULTIPLAYERSESSIONS_API UMultiplayerSessionsSubsystem : public UGameInstanceSubsystem
 {
@@ -30,9 +50,16 @@ public:
     void DestroySession();
     void StartSession();
 
+    //
+    // Our own custom delegates for the Menu class to bind callbacks to
+    //
+    FMultiplayerOnCreateSessionComplete MultiplayerOnCreateSessionComplete;
+
 protected:
+    //
     // Internal callbacks for the delegates we will add to the Online Session Interface delegate list
     // These don't need to be called outside of this class
+    //
 
     void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
     void OnFindSessionsComplete(bool bWasSuccessful);

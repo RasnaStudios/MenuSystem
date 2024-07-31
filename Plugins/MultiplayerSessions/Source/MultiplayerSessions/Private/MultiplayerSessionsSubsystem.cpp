@@ -51,10 +51,14 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
 
     if (const ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer(); LocalPlayer != nullptr)
     {
-        // Create the session and if it fails, remove the delegate handle
+        // Create the session and if it fails, remove the delegate handle and broadcast the custom delegate
         if (!SessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *LastSessionSettings))
         {
+            // Remove the delegate handle
             SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
+
+            // Broadcast our own custom delegate
+            MultiplayerOnCreateSessionComplete.Broadcast(false);
         }
     }
 }
@@ -76,6 +80,12 @@ void UMultiplayerSessionsSubsystem::StartSession()
 
 void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
+    // Remove the delegate handle
+    if (SessionInterface)
+        SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
+
+    // Broadcast our own custom delegate. The menu will receive the value of bWasSuccessful
+    MultiplayerOnCreateSessionComplete.Broadcast(bWasSuccessful);
 }
 void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 {

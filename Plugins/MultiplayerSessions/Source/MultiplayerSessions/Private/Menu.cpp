@@ -11,10 +11,10 @@ void UMenu::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UMenu::MenuSetup(const int32 NumPublicConnections, FString MatchType)
+void UMenu::MenuSetup(int32 NumberOfPublicConnections, FString TypeOfMatch)
 {
-    _NumPublicConnections = NumPublicConnections;
-    _MatchType = MatchType;
+    NumPublicConnections = NumberOfPublicConnections;
+    MatchType = TypeOfMatch;
     AddToViewport();
     SetVisibility(ESlateVisibility::Visible);
 
@@ -22,7 +22,7 @@ void UMenu::MenuSetup(const int32 NumPublicConnections, FString MatchType)
     {
         if (APlayerController* PlayerController = World->GetFirstPlayerController())
         {
-            // Set the input mode to UI
+            // Set the input mode to UI only, so the player can interact with the menu but they can't move the character
             FInputModeUIOnly InputModeData;
             InputModeData.SetWidgetToFocus(TakeWidget());
             InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
@@ -36,6 +36,12 @@ void UMenu::MenuSetup(const int32 NumPublicConnections, FString MatchType)
     if (UGameInstance* GameInstance = GetGameInstance())
     {
         MultiplayerSessionsSubsystem = GameInstance->GetSubsystem<UMultiplayerSessionsSubsystem>();
+    }
+
+    if (MultiplayerSessionsSubsystem)
+    {
+        MultiplayerSessionsSubsystem->MultiplayerOnCreateSessionComplete.AddDynamic(this, &ThisClass::OnCreateSession);
+        UE_LOG(LogTemp, Warning, TEXT("Bound OnCreateSession"));
     }
 }
 
@@ -60,28 +66,16 @@ bool UMenu::Initialize()
 
 void UMenu::HostButtonClicked()
 {
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("Host Button Clicked"));
-    }
-
     if (MultiplayerSessionsSubsystem)
     {
-        MultiplayerSessionsSubsystem->CreateSession(_NumPublicConnections, _MatchType);
-        // Travel to the lobby level
-        if (UWorld* World = GetWorld())
-        {
-            World->ServerTravel("/Game/Maps/Lobby?listen");
-        }
+        MultiplayerSessionsSubsystem->CreateSession(NumPublicConnections, MatchType);
     }
 }
 
 void UMenu::JoinButtonClicked()
 {
     if (GEngine)
-    {
         GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("Join Button Clicked"));
-    }
 }
 
 void UMenu::MenuTearDown()
@@ -95,5 +89,24 @@ void UMenu::MenuTearDown()
             PlayerController->SetInputMode(InputModeData);
             PlayerController->bShowMouseCursor = false;
         }
+    }
+}
+
+void UMenu::OnCreateSession(bool bWasSuccessful)
+{
+    if (bWasSuccessful)
+    {
+        if (GEngine)
+            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Session created successfully"));
+        // Travel to the lobby level
+        if (UWorld* World = GetWorld())
+        {
+            World->ServerTravel("/Game/Maps/Lobby?listen");
+        }
+    }
+    else
+    {
+        if (GEngine)
+            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Failed to create session"));
     }
 }

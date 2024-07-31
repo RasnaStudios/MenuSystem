@@ -25,7 +25,7 @@ public:
      * Sets up the menu. This function is callable from Blueprints.
      */
     UFUNCTION(BlueprintCallable)
-    void MenuSetup(const int32 NumPublicConnections, FString MatchType);
+    void MenuSetup(int32 NumberOfPublicConnections = 4, FString TypeOfMatch = FString(TEXT("FreeForAll")));
 
 protected:
     /**
@@ -33,6 +33,13 @@ protected:
      * @return true if the initialization is successful, false otherwise.
      */
     virtual bool Initialize() override;
+
+    //
+    // Callbacks for the custom delegates on the MultiplayerSessionSubsystem
+    // These will be called in this class to handle the results of the session operations
+    //
+    UFUNCTION()
+    void OnCreateSession(bool bWasSuccessful);
 
 private:
     // These buttons are binded in the blueprint and the names must match the names in the blueprint
@@ -61,6 +68,6 @@ private:
     UPROPERTY()
     UMultiplayerSessionsSubsystem* MultiplayerSessionsSubsystem;
 
-    int32 _NumPublicConnections = 4;
-    FString _MatchType = "FreeForAll";
+    int32 NumPublicConnections{4};
+    FString MatchType{TEXT("FreeForAll")};
 };
