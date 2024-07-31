@@ -42,7 +42,8 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
 
     // If there's a subsystem then the match is LAN, otherwise it's online
     LastSessionSettings->bIsLANMatch = IOnlineSubsystem::Get()->GetSubsystemName() == "NULL";
-    LastSessionSettings->NumPublicConnections = NumPublicConnections;    // Number of players that can join the session
+    LastSessionSettings->NumPublicConnections =
+        NumPublicConnections;    // Number of players that can join the session (not the number of players in the game)
     LastSessionSettings->bAllowJoinInProgress = true;     // Allow players to join the session even if it's already started
     LastSessionSettings->bAllowJoinViaPresence = true;    // Allow players to join the session via presence (friends list)
     LastSessionSettings->bShouldAdvertise = true;    // Advertise the session to the online subsystem so other players can find it
@@ -50,6 +51,7 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
     LastSessionSettings->bUseLobbiesIfAvailable = true;    // Use lobbies if available
     LastSessionSettings->Set(
         FName("MatchType"), MatchType, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);    // Set the match type
+    LastSessionSettings->BuildUniqueId = 1;    // Generate a new unique ID for the session
 
     if (const ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer(); LocalPlayer != nullptr)
     {
