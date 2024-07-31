@@ -12,6 +12,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "Interfaces/OnlineSessionInterface.h"
+#include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -20,6 +21,8 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 // AMenuSystemCharacter
 
 AMenuSystemCharacter::AMenuSystemCharacter()
+    :    // This creates and sets the delegate to call when the session is created
+    CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnCreateSessionComplete))
 {
     // Set size for collision capsule
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -79,10 +82,58 @@ void AMenuSystemCharacter::BeginPlay()
 
 void AMenuSystemCharacter::CreateGameSession()
 {
+    // called when pressed 1 key
+    if (!OnlineSessionInterface.IsValid())
+    {
+        return;
+    }
+    // NAME_GameSession is a predefined name for the session which is accessible globally
+    auto ExistingSession = OnlineSessionInterface->GetNamedSession(NAME_GameSession);
+    // we only want to create a session if one doesn't already exist
+    if (ExistingSession != nullptr)
+    {
+        OnlineSessionInterface->DestroySession(NAME_GameSession);
+    }
+
+    // We need to set the delegate to call when the session is created
+    OnlineSessionInterface->AddOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegate);
+
+    // We create a new session settings object where MakeShareable is a helper function to create a shared pointer
+    TSharedPtr<FOnlineSessionSettings> SessionSettings = MakeShareable(new FOnlineSessionSettings());
+    // We set some session settings
+    SessionSettings->bIsLANMatch = false;            // This is a LAN match
+    SessionSettings->NumPublicConnections = 4;       // This is the maximum number of players that can join the session
+    SessionSettings->bAllowJoinInProgress = true;    // This allows players to join the session even if it has already started
+    SessionSettings->bAllowJoinViaPresence =
+        true;    // This allows players to join the session via presence which is a steam feature to join friends in the same region
+    SessionSettings->bShouldAdvertise =
+        true;    // This allows steam to advertise the session so that other players can see it and join
+    SessionSettings->bUsesPresence = true;             // This allows the session to use presence (steam)
+    SessionSettings->bUseLobbiesIfAvailable = true;    // This allows the session to use lobbies if available, otherwise it crashes
+
+    // We need a local player to get a unique net id
+    const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
+    // We now create a session with the unique net id, the name NAME_GameSession and the settings we just created
+    OnlineSessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *SessionSettings);
 }
 
+// The delegate function to call when the session creation is complete to check that the session was created correctly
 void AMenuSystemCharacter::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
+    if (bWasSuccessful)
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, TEXT("Created session: " + SessionName.ToString()));
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, TEXT("Failed to create session"));
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
