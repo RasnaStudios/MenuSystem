@@ -76,9 +76,16 @@ protected:
     UFUNCTION(BlueprintCallable)
     void CreateGameSession();
 
+    UFUNCTION(BlueprintCallable)
+    void JoinGameSession();
+
     // The delegate function to call when the session creation is complete
     void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
+    // The delegate function to call when the session search is complete
+    void OnFindSessionsComplete(bool bWasSuccessful);
 
 private:
     FOnCreateSessionCompleteDelegate CreateSessionCompleteDelegate;
+    FOnFindSessionsCompleteDelegate FindSessionsCompleteDelegate;
+    TSharedPtr<FOnlineSessionSearch> SessionSearch;
 };

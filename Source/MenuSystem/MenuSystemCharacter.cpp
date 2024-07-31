@@ -12,6 +12,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "Interfaces/OnlineSessionInterface.h"
+#include "Online/OnlineSessionNames.h"
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 
@@ -21,8 +22,9 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 // AMenuSystemCharacter
 
 AMenuSystemCharacter::AMenuSystemCharacter()
-    :    // This creates and sets the delegate to call when the session is created
+    :    // These create and set the delegates to call when the session is created and found
     CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnCreateSessionComplete))
+    , FindSessionsCompleteDelegate(FOnFindSessionsCompleteDelegate::CreateUObject(this, &ThisClass::OnFindSessionsComplete))
 {
     // Set size for collision capsule
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -117,6 +119,34 @@ void AMenuSystemCharacter::CreateGameSession()
     OnlineSessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *SessionSettings);
 }
 
+void AMenuSystemCharacter::JoinGameSession()
+{
+    // Find game sessions
+
+    if (!OnlineSessionInterface.IsValid())
+    {
+        UE_LOG(LogTemp, Error, TEXT("OnlineSessionInterface is not valid"));
+        return;
+    }
+
+    // we set the delegate to call when the session search is complete
+    OnlineSessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
+
+    // We search for sessions with the name NAME_GameSession
+    SessionSearch = MakeShareable(new FOnlineSessionSearch());
+
+    // We set some search settings
+    SessionSearch->MaxSearchResults = 10000;    // This is the maximum number of sessions to find
+    SessionSearch->bIsLanQuery = false;         // This is a LAN query
+    SessionSearch->QuerySettings.Set(
+        SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);    // Allows to search for sessions with steam presence
+
+    // We need a local player to get a unique net id
+    const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
+    // We now search for sessions with the unique net id and the settings we just created
+    OnlineSessionInterface->FindSessions(*LocalPlayer->GetPreferredUniqueNetId(), SessionSearch.ToSharedRef());
+}
+
 // The delegate function to call when the session creation is complete to check that the session was created correctly
 void AMenuSystemCharacter::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
@@ -132,6 +162,27 @@ void AMenuSystemCharacter::OnCreateSessionComplete(FName SessionName, bool bWasS
         if (GEngine)
         {
             GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, TEXT("Failed to create session"));
+        }
+    }
+}
+
+// The delegate function to call when the session search is complete to check that any sessions were found
+void AMenuSystemCharacter::OnFindSessionsComplete(bool bWasSuccessful)
+{
+    for (const FOnlineSessionSearchResult& SearchResult : SessionSearch->SearchResults)
+    {
+        if (GEngine)
+        {
+            FString ID = SearchResult.GetSessionIdStr();
+            FString User = SearchResult.Session.OwningUserName;
+            FString Name = SearchResult.Session.SessionSettings.Settings.FindRef("SessionName").Data.ToString();
+            FString Map = SearchResult.Session.SessionSettings.Settings.FindRef("MapName").Data.ToString();
+            FString NumPlayers = FString::FromInt(SearchResult.Session.SessionSettings.NumPublicConnections);
+            FString MaxPlayers = FString::FromInt(SearchResult.Session.SessionSettings.NumPublicConnections);
+            FString Ping = FString::FromInt(SearchResult.PingInMs);
+            FString Result = FString::Printf(TEXT("ID: %s, User: %s, Name: %s, Map: %s, NumPlayers: %s, MaxPlayers: %s, Ping: %s"),
+                *ID, *User, *Name, *Map, *NumPlayers, *MaxPlayers, *Ping);
+            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, *Result);
         }
     }
 }
