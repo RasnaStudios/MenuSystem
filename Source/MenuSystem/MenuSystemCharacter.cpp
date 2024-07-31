@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2023-2024 Rasna Studios. All rights reserved.
 
 #include "MenuSystemCharacter.h"
 
