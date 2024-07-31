@@ -5,11 +5,18 @@
 #include "Components/Button.h"
 #include "MultiplayerSessionsSubsystem.h"
 
-void UMenu::SetupMenu()
+void UMenu::NativeDestruct()
 {
+    MenuTearDown();
+    Super::NativeDestruct();
+}
+
+void UMenu::MenuSetup(const int32 NumPublicConnections, FString MatchType)
+{
+    _NumPublicConnections = NumPublicConnections;
+    _MatchType = MatchType;
     AddToViewport();
     SetVisibility(ESlateVisibility::Visible);
-    bIsFocusable = true;
 
     if (const UWorld* World = GetWorld())
     {
@@ -60,7 +67,12 @@ void UMenu::HostButtonClicked()
 
     if (MultiplayerSessionsSubsystem)
     {
-        MultiplayerSessionsSubsystem->CreateSession(4, FString("Deathmatch"));
+        MultiplayerSessionsSubsystem->CreateSession(_NumPublicConnections, _MatchType);
+        // Travel to the lobby level
+        if (UWorld* World = GetWorld())
+        {
+            World->ServerTravel("/Game/Maps/Lobby?listen");
+        }
     }
 }
 
@@ -68,6 +80,20 @@ void UMenu::JoinButtonClicked()
 {
     if (GEngine)
     {
-        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("Host Button Clicked"));
+        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("Join Button Clicked"));
+    }
+}
+
+void UMenu::MenuTearDown()
+{
+    RemoveFromParent();
+    if (const UWorld* World = GetWorld())
+    {
+        if (APlayerController* PlayerController = World->GetFirstPlayerController())
+        {
+            const FInputModeGameOnly InputModeData;
+            PlayerController->SetInputMode(InputModeData);
+            PlayerController->bShowMouseCursor = false;
+        }
     }
 }

@@ -43,9 +43,12 @@ protected:
 private:
     IOnlineSessionPtr SessionInterface;
 
+    // The last session settings used to create a session
+    TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
+
     //
-    // To add to the Onlune Session Interface delegate list
-    // We will bind our MultiplayerSessionsSystem interal callbacks to these.
+    // To add to the Online Session Interface delegate list
+    // We will bind our MultiplayerSessionsSystem internal callbacks to these.
     // For each of the delegates we need a delegate handle to add and remove them
     //
 

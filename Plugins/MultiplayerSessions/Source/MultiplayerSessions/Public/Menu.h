@@ -7,6 +7,7 @@
 
 #include "Menu.generated.h"
 
+class UMultiplayerSessionsSubsystem;
 class UButton;
 
 /**
@@ -18,11 +19,13 @@ class MULTIPLAYERSESSIONS_API UMenu : public UUserWidget
     GENERATED_BODY()
 
 public:
+    virtual void NativeDestruct() override;
+
     /**
      * Sets up the menu. This function is callable from Blueprints.
      */
     UFUNCTION(BlueprintCallable)
-    void SetupMenu();
+    void MenuSetup(const int32 NumPublicConnections, FString MatchType);
 
 protected:
     /**
@@ -52,7 +55,12 @@ private:
     UFUNCTION()
     void JoinButtonClicked();
 
+    void MenuTearDown();
+
     /** Subsystem for handling multiplayer sessions. */
     UPROPERTY()
-    class UMultiplayerSessionsSubsystem* MultiplayerSessionsSubsystem;
+    UMultiplayerSessionsSubsystem* MultiplayerSessionsSubsystem;
+
+    int32 _NumPublicConnections = 4;
+    FString _MatchType = "FreeForAll";
 };

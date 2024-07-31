@@ -2,6 +2,7 @@
 
 #include "MultiplayerSessionsSubsystem.h"
 
+#include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 
 UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem()
@@ -22,7 +23,42 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem()
 
 void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FString MatchType)
 {
+    if (!SessionInterface.IsValid())
+    {
+        return;
+    }
+    // Destroy the existing session if it exists
+    if (const auto ExistingSession = SessionInterface->GetNamedSession(NAME_GameSession); ExistingSession != nullptr)
+    {
+        SessionInterface->DestroySession(NAME_GameSession);
+    }
+
+    // Store the delegate handle, so we can remove it later from the delegate list
+    SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegate);
+
+    // We create the session settings
+    LastSessionSettings = MakeShared<FOnlineSessionSettings>();
+
+    // If there's a subsystem then the match is LAN, otherwise it's online
+    LastSessionSettings->bIsLANMatch = IOnlineSubsystem::Get()->GetSubsystemName() == "NULL";
+    LastSessionSettings->NumPublicConnections = NumPublicConnections;    // Number of players that can join the session
+    LastSessionSettings->bAllowJoinInProgress = true;     // Allow players to join the session even if it's already started
+    LastSessionSettings->bAllowJoinViaPresence = true;    // Allow players to join the session via presence (friends list)
+    LastSessionSettings->bShouldAdvertise = true;    // Advertise the session to the online subsystem so other players can find it
+    LastSessionSettings->bUsesPresence = true;       // Use presence (friends list) to find the session
+    LastSessionSettings->Set(
+        FName("MatchType"), MatchType, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);    // Set the match type
+
+    if (const ULocalPlayer* LocalPlayer = GetGameInstance()->GetFirstGamePlayer(); LocalPlayer != nullptr)
+    {
+        // Create the session and if it fails, remove the delegate handle
+        if (!SessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *LastSessionSettings))
+        {
+            SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
+        }
+    }
 }
+
 void UMultiplayerSessionsSubsystem::FindSessions(int32 MaxSearchResults)
 {
 }
