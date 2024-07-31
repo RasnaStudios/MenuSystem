@@ -11,6 +11,8 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
+#include "Interfaces/OnlineSessionInterface.h"
+#include "OnlineSubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -55,12 +57,32 @@ AMenuSystemCharacter::AMenuSystemCharacter()
 
     // Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character)
     // are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+
+    IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get();
+    if (OnlineSubsystem)
+    {
+        OnlineSessionInterface = OnlineSubsystem->GetSessionInterface();
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue,
+                FString::Printf(TEXT("Found subsystem %s"), *OnlineSubsystem->GetSubsystemName().ToString()));
+        }
+    }
 }
 
 void AMenuSystemCharacter::BeginPlay()
 {
     // Call the base class
     Super::BeginPlay();
+}
+
+void AMenuSystemCharacter::CreateGameSession()
+{
+}
+
+void AMenuSystemCharacter::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
+{
 }
 
 //////////////////////////////////////////////////////////////////////////

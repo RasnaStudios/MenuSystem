@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Interfaces/OnlineSessionDelegates.h"
+#include "Interfaces/OnlineSessionInterface.h"
 #include "Logging/LogMacros.h"
 
 #include "MenuSystemCharacter.generated.h"
@@ -67,4 +69,16 @@ public:
     FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
     /** Returns FollowCamera subobject **/
     FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+    IOnlineSessionPtr OnlineSessionInterface;
+
+protected:
+    UFUNCTION(BlueprintCallable)
+    void CreateGameSession();
+
+    // The delegate function to call when the session creation is complete
+    void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
+
+private:
+    FOnCreateSessionCompleteDelegate CreateSessionCompleteDelegate;
 };
