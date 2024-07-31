@@ -83,9 +83,12 @@ protected:
     void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
     // The delegate function to call when the session search is complete
     void OnFindSessionsComplete(bool bWasSuccessful);
+    // The delegate function to call when the session join is complete
+    void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
 
 private:
     FOnCreateSessionCompleteDelegate CreateSessionCompleteDelegate;
     FOnFindSessionsCompleteDelegate FindSessionsCompleteDelegate;
     TSharedPtr<FOnlineSessionSearch> SessionSearch;
+    FOnJoinSessionCompleteDelegate JoinSessionCompleteDelegate;
 };

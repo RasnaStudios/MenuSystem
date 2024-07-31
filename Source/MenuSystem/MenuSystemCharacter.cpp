@@ -25,6 +25,7 @@ AMenuSystemCharacter::AMenuSystemCharacter()
     :    // These create and set the delegates to call when the session is created and found
     CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnCreateSessionComplete))
     , FindSessionsCompleteDelegate(FOnFindSessionsCompleteDelegate::CreateUObject(this, &ThisClass::OnFindSessionsComplete))
+    , JoinSessionCompleteDelegate(FOnJoinSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnJoinSessionComplete))
 {
     // Set size for collision capsule
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -113,6 +114,9 @@ void AMenuSystemCharacter::CreateGameSession()
     SessionSettings->bUsesPresence = true;             // This allows the session to use presence (steam)
     SessionSettings->bUseLobbiesIfAvailable = true;    // This allows the session to use lobbies if available, otherwise it crashes
 
+    // We set the match type, so we can search for sessions with the same match type
+    SessionSettings->Set(FName("MatchType"), FString("FreeForAll"), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+
     // We need a local player to get a unique net id
     const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
     // We now create a session with the unique net id, the name NAME_GameSession and the settings we just created
@@ -156,6 +160,12 @@ void AMenuSystemCharacter::OnCreateSessionComplete(FName SessionName, bool bWasS
         {
             GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, TEXT("Created session: " + SessionName.ToString()));
         }
+
+        UWorld* World = GetWorld();
+        if (World)
+        {
+            World->ServerTravel("/Game/Maps/Lobby?listen");
+        }
     }
     else
     {
@@ -169,21 +179,65 @@ void AMenuSystemCharacter::OnCreateSessionComplete(FName SessionName, bool bWasS
 // The delegate function to call when the session search is complete to check that any sessions were found
 void AMenuSystemCharacter::OnFindSessionsComplete(bool bWasSuccessful)
 {
+    if (!OnlineSessionInterface.IsValid())
+    {
+        return;
+    }
     for (const FOnlineSessionSearchResult& SearchResult : SessionSearch->SearchResults)
+    {
+        FString ID = SearchResult.GetSessionIdStr();
+        FString User = SearchResult.Session.OwningUserName;
+        FString MatchType = SearchResult.Session.SessionSettings.Settings.FindRef(FName("MatchType")).Data.ToString();
+
+        FString NumPlayers = FString::FromInt(SearchResult.Session.SessionSettings.NumPublicConnections);
+        FString MaxPlayers = FString::FromInt(SearchResult.Session.SessionSettings.NumPublicConnections);
+        FString Ping = FString::FromInt(SearchResult.PingInMs);
+        if (GEngine)
+        {
+            FString Result = FString::Printf(TEXT("ID: %s, User: %s, Match Type: %s, NumPlayers: %s, MaxPlayers: %s, Ping: %s"),
+                *ID, *User, *MatchType, *NumPlayers, *MaxPlayers, *Ping);
+            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, *Result);
+        }
+        // We join the session if it is a FreeForAll match
+        if (MatchType == "FreeForAll")
+        {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, TEXT("Joining Match Type: " + MatchType));
+            }
+
+            // We set the delegate to call when the session join is complete
+            OnlineSessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
+
+            // We join the session with the unique net id and the session we found
+            const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
+            OnlineSessionInterface->JoinSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, SearchResult);
+        }
+    }
+}
+
+void AMenuSystemCharacter::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
+{
+    if (!OnlineSessionInterface.IsValid())
+    {
+        return;
+    }
+
+    // We get the connect string to join the session from the session interface. This is an IP address and port
+    FString ConnectString;
+    if (OnlineSessionInterface->GetResolvedConnectString(NAME_GameSession, ConnectString))
     {
         if (GEngine)
         {
-            FString ID = SearchResult.GetSessionIdStr();
-            FString User = SearchResult.Session.OwningUserName;
-            FString Name = SearchResult.Session.SessionSettings.Settings.FindRef("SessionName").Data.ToString();
-            FString Map = SearchResult.Session.SessionSettings.Settings.FindRef("MapName").Data.ToString();
-            FString NumPlayers = FString::FromInt(SearchResult.Session.SessionSettings.NumPublicConnections);
-            FString MaxPlayers = FString::FromInt(SearchResult.Session.SessionSettings.NumPublicConnections);
-            FString Ping = FString::FromInt(SearchResult.PingInMs);
-            FString Result = FString::Printf(TEXT("ID: %s, User: %s, Name: %s, Map: %s, NumPlayers: %s, MaxPlayers: %s, Ping: %s"),
-                *ID, *User, *Name, *Map, *NumPlayers, *MaxPlayers, *Ping);
-            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, *Result);
+            GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Yellow, TEXT("Connect string: " + ConnectString));
         }
+    }
+
+    APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+    if (PlayerController)
+    {
+        // We travel to the lobby map with the connect string
+        PlayerController->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
     }
 }
 
