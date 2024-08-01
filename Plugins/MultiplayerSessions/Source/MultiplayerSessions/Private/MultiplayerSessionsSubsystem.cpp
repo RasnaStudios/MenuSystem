@@ -31,7 +31,11 @@ void UMultiplayerSessionsSubsystem::CreateSession(int32 NumPublicConnections, FS
     // Destroy the existing session if it exists
     if (const auto ExistingSession = SessionInterface->GetNamedSession(NAME_GameSession); ExistingSession != nullptr)
     {
-        SessionInterface->DestroySession(NAME_GameSession);
+        // We need to destroy the session on destroy, so we can create a new one
+        bCreateSessionOnDestroy = true;
+        LastNumPublicConnections = NumPublicConnections;
+        LastMatchType = MatchType;
+        DestroySession();
     }
 
     // Store the delegate handle, so we can remove it later from the delegate list
@@ -93,6 +97,7 @@ void UMultiplayerSessionsSubsystem::FindSessions(int32 MaxSearchResults)
         MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
     }
 }
+
 void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult& SearchResult)
 {
     if (!SessionInterface.IsValid())
@@ -114,11 +119,46 @@ void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult
         MultiplayerOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
     }
 }
+
 void UMultiplayerSessionsSubsystem::DestroySession()
 {
+    if (!SessionInterface.IsValid())
+    {
+        MultiplayerOnDestroySessionComplete.Broadcast(false);
+        UE_LOG(LogTemp, Error, TEXT("Session interface is not valid"));
+        return;
+    }
+    // Store the delegate handle, so we can remove it later from the delegate list
+    SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegate);
+
+    // Destroy the session
+    if (!SessionInterface->DestroySession(NAME_GameSession))
+    {
+        // If the destroy fails, remove the delegate handle and broadcast the custom delegate with an error
+        SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+        MultiplayerOnDestroySessionComplete.Broadcast(false);
+    }
 }
+
 void UMultiplayerSessionsSubsystem::StartSession()
 {
+    if (!SessionInterface.IsValid())
+    {
+        MultiplayerOnStartSessionComplete.Broadcast(false);
+        UE_LOG(LogTemp, Error, TEXT("Session interface is not valid"));
+        return;
+    }
+
+    // Store the delegate handle, so we can remove it later from the delegate list
+    SessionInterface->AddOnStartSessionCompleteDelegate_Handle(StartSessionCompleteDelegate);
+
+    // Start the session
+    if (!SessionInterface->StartSession(NAME_GameSession))
+    {
+        // If the start fails, remove the delegate handle and broadcast the custom delegate with an error
+        SessionInterface->ClearOnStartSessionCompleteDelegate_Handle(StartSessionCompleteDelegateHandle);
+        MultiplayerOnStartSessionComplete.Broadcast(false);
+    }
 }
 
 // Callbacks for delegates
@@ -132,6 +172,7 @@ void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, b
     // Broadcast our own custom delegate. The menu will receive the value of bWasSuccessful
     MultiplayerOnCreateSessionComplete.Broadcast(bWasSuccessful);
 }
+
 void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 {
     // Remove the delegate handle
@@ -148,6 +189,7 @@ void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
     // Broadcast our own custom delegate. The menu will receive the search results and the value of bWasSuccessful
     MultiplayerOnFindSessionsComplete.Broadcast(LastSessionSearch->SearchResults, bWasSuccessful);
 }
+
 void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
 {
     // Remove the delegate handle
@@ -157,9 +199,30 @@ void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOn
     // Broadcast our own custom delegate. The menu will receive the result of the join operation
     MultiplayerOnJoinSessionComplete.Broadcast(Result);
 }
+
 void UMultiplayerSessionsSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
+    // Remove the delegate handle
+    if (SessionInterface)
+        SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+
+    // Check if we need to create a session after destroying the current one
+    if (bWasSuccessful && bCreateSessionOnDestroy)
+    {
+        bCreateSessionOnDestroy = false;
+        // Create a new session with the last settings
+        CreateSession(LastNumPublicConnections, LastMatchType);
+    }
+    // Broadcast our own custom delegate. The menu will receive the value of bWasSuccessful
+    MultiplayerOnDestroySessionComplete.Broadcast(bWasSuccessful);
 }
+
 void UMultiplayerSessionsSubsystem::OnStartSessionComplete(FName SessionName, bool bWasSuccessful)
 {
+    // Remove the delegate handle
+    if (SessionInterface)
+        SessionInterface->ClearOnStartSessionCompleteDelegate_Handle(StartSessionCompleteDelegateHandle);
+
+    // Broadcast our own custom delegate. The menu will receive the value of bWasSuccessful
+    MultiplayerOnStartSessionComplete.Broadcast(bWasSuccessful);
 }

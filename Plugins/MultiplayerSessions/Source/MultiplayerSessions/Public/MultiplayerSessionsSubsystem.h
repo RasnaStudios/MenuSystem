@@ -104,4 +104,10 @@ private:
 
     FOnStartSessionCompleteDelegate StartSessionCompleteDelegate;
     FDelegateHandle StartSessionCompleteDelegateHandle;
+
+    // Variables to store the last session settings used to create a session
+    // so that we can use them to know if we need to create a session on destroy
+    bool bCreateSessionOnDestroy{false};
+    int32 LastNumPublicConnections{0};
+    FString LastMatchType{TEXT("")};
 };

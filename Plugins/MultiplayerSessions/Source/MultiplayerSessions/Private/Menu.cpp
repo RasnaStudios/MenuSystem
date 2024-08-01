@@ -12,8 +12,9 @@ void UMenu::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UMenu::MenuSetup(int32 NumberOfPublicConnections, FString TypeOfMatch)
+void UMenu::MenuSetup(int32 NumberOfPublicConnections, FString TypeOfMatch, FString LobbyPath)
 {
+    PathToLobby = FString::Printf(TEXT("%s?listen"), *LobbyPath);
     NumPublicConnections = NumberOfPublicConnections;
     MatchType = TypeOfMatch;
     AddToViewport();
@@ -70,6 +71,7 @@ bool UMenu::Initialize()
 
 void UMenu::HostButtonClicked()
 {
+    HostButton->SetIsEnabled(false);
     if (MultiplayerSessionsSubsystem)
     {
         MultiplayerSessionsSubsystem->CreateSession(NumPublicConnections, MatchType);
@@ -78,6 +80,7 @@ void UMenu::HostButtonClicked()
 
 void UMenu::JoinButtonClicked()
 {
+    JoinButton->SetIsEnabled(false);
     if (MultiplayerSessionsSubsystem)
     {
         MultiplayerSessionsSubsystem->FindSessions(10000);
@@ -107,13 +110,16 @@ void UMenu::OnCreateSession(bool bWasSuccessful)
         // Travel to the lobby level
         if (UWorld* World = GetWorld())
         {
-            World->ServerTravel("/Game/Maps/Lobby?listen");
+            World->ServerTravel(PathToLobby);
         }
     }
     else
     {
         if (GEngine)
             GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Failed to create session"));
+
+        // Reenable the host button if the session creation failed
+        HostButton->SetIsEnabled(true);
     }
 }
 
@@ -141,6 +147,11 @@ void UMenu::OnFindSessions(const TArray<FOnlineSessionSearchResult>& SearchResul
             return;
         }
     }
+    // Reenable the join button if no session was found even if the search was successful
+    if (bWasSuccessful || SearchResults.Num() == 0)
+    {
+        JoinButton->SetIsEnabled(true);
+    }
 }
 void UMenu::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
 {
@@ -160,6 +171,11 @@ void UMenu::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
             }
         }
     }
+    // Reenable the join button if the session join was unsuccessful
+    if (Result != EOnJoinSessionCompleteResult::Success)
+    {
+        JoinButton->SetIsEnabled(true);
+    }
 }
 
 void UMenu::OnDestroySession(bool bWasSuccessful)
@@ -167,4 +183,6 @@ void UMenu::OnDestroySession(bool bWasSuccessful)
 }
 void UMenu::OnStartSession(bool bWasSuccessful)
 {
+    if (GEngine)
+        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Session started successfully"));
 }
