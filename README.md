@@ -8,6 +8,14 @@ This project provides a foundational structure for handling multiplayer sessions
 
 https://github.com/user-attachments/assets/086e9d37-a7d5-47e7-994e-a39a6d9524e7
 
+## Test the executable
+
+Download the zip file from the [release page](https://github.com/RasnaStudios/MenuSystem/releases) depending on your platform.
+To test this package, you need to have separate computers with a different steam account respectively. Steam app/client must be open.
+
+When opening the app, you can choose either Host or Join. One computer must Host a session. The other one can then Join.
+After some seconds the joiner would appear in the host game.
+
 ## Features
 
 - Basic session creation and management
